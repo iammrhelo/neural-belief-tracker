@@ -1,24 +1,22 @@
 # -*- coding: utf-8 -*-
 #!/usr/local/bin/python
-import os
-import sys
-from copy import deepcopy
-import json
-import time
+import codecs
+import ConfigParser
 import cPickle
+import json
+import math
+import os
+import random
+import string
+import sys
+import time
+import types
+from copy import deepcopy
+from random import shuffle
+
 import numpy
 import tensorflow as tf
-import random
-import math
-import string
-import ConfigParser
-import types
-import codecs 
-
-
-from random import shuffle
 from numpy.linalg import norm
-
 
 from models import model_definition
 
@@ -573,8 +571,8 @@ def load_woz_data(file_path, language, percentage=1.0,override_en_ontology=False
                 # print (inf_slot, turn[5][inf_slot])
                 if inf_slot != "request":
                     current_label.append((inf_slot, turn[4][inf_slot]))
-#                    if inf_slot == "request":
-#                        print "!!!!!", inf_slot, turn[5][inf_slot]
+                #  if inf_slot == "request":
+                #  print "!!!!!", inf_slot, turn[5][inf_slot]
 
             transcription_and_asr = turn[0]
             current_utterance = (transcription_and_asr, turn[1], turn[2], turn[3], current_label, turn[5]) #turn [5] is the past belief state
@@ -718,7 +716,7 @@ def print_belief_state_woz_informable(curr_values, distribution,threshold):
     max_value = "none"
     max_score = 0.0
     total_value = 0.0
-
+    
     for idx, value in enumerate(curr_values):
         
         total_value += distribution[idx]
@@ -1058,7 +1056,7 @@ def evaluate_model(dataset_name, sess, model_variables, data, target_slot, utter
                                     requested_slots: xss_sys_req, system_act_confirm_slots: xss_conf_slots, \
                                     system_act_confirm_values: xss_conf_values, y_: xss_labels, y_past_state: xss_prev_labels, keep_prob: 1.0})
 
-#       below lines print predictions for small batches to see what is being predicted
+    # below lines print predictions for small batches to see what is being predicted
 #        if idx == 0 or idx == batch_count - 2:
 #            #print current_y.shape, xss_labels.shape, xs_labels.shape
 #            print "\n\n", numpy.argmax(current_y, axis=1), "\n", numpy.argmax(xss_labels, axis=1), "\n==============================\n\n"
@@ -1547,7 +1545,6 @@ def test_utterance(sess, utterances, word_vectors, dialogue_ontology, model_vari
                                       system_act_confirm_slots: fv_conf_slot, y_past_state: features_previous_state, system_act_confirm_values: fv_conf_val, \
                                       keep_prob: 1.0})
 
-
     belief_state = distribution[:, 0]
 
     current_start_idx = 0
@@ -1783,7 +1780,6 @@ class NeuralBeliefTracker:
         if past_belief_state is None:
             past_belief_state = {"food": "none", "area": "none", "price range": "none"}
 
-
         utterance = [((utterance, [(utterance, 1.0)]), [req_slot], [conf_slot], [conf_value], past_belief_state)]
 
         print "Testing Utterance: ", utterance
@@ -1870,7 +1866,35 @@ class NeuralBeliefTracker:
                 saver.restore(sessions[load_slot], path_to_load)
 
             evaluated_dialogues, belief_states = track_woz_data(woz_dialogues, self.model_variables, self.word_vectors, self.dialogue_ontology, sessions)
-            list_of_belief_states.append(belief_states) # only useful for interpolating. 
+            list_of_belief_states.append(belief_states) 
+
+
+        # Modify stuff here to print out 
+        topk = 5
+        for evaluate_dialogue, belief_state in zip(evaluated_dialogues, belief_states):
+            dialogue = evaluate_dialogue['dialogue']
+
+            for turn_idx, (dialogue_turn, turn_belief_state) in enumerate(zip(dialogue, belief_state)):
+                
+
+                lattice = {}
+
+                for slot_type, slot_values in self.dialogue_ontology.items():
+                    
+                    slot_distribution = turn_belief_state[ slot_type ]
+                    all_values = slot_values + ["none"]
+
+                    if slot_type == "request":
+                        topk_slot_values = all_values
+                    else:
+                        topk_indices = numpy.argsort(slot_distribution)[::-1][:topk]
+                        topk_slot_values = [ all_values[index] for index in topk_indices ]
+
+                    lattice[slot_type] = topk_slot_values
+
+                Lattice = { "Lattice": lattice }
+
+                dialogue[turn_idx] += (Lattice,)
 
         results = evaluate_woz(evaluated_dialogues, self.dialogue_ontology)
 
@@ -1941,4 +1965,3 @@ def main():
 
 if __name__ == "__main__":
     main()              
-
