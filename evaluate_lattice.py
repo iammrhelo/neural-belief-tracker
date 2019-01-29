@@ -38,13 +38,20 @@ def main(opt):
                     request_count += abs(len(slot_value) -
                                          len(pred_slot_value))
                 else:
-                    if slot_value == pred_slot_value:
+                    if relax_count == -1:
+                        continue
+                    elif slot_value == pred_slot_value:
                         pass
                     elif slot_value in lattice_top_values:
                         relax_count += 1
                     else:
                         relax_count = -1  # Not in top k
                         break
+
+            if relax_count == 2:
+                print("True state", true_state)
+                print("Prediction", pred_state)
+                print("Lattice", lattice)
 
             num_relax[relax_count] += 1
             num_request[request_count] += 1
